@@ -1,0 +1,53 @@
+name: CI/CD Pipeline - Apex Standard
+
+on: 
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  build-test-lint:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js Environment (LTS 20.x)
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Install Dependencies
+        run: npm ci
+
+      - name: 🧹 Run Biome Check (Linting & Formatting)
+        # Enforcing Apex standard (Biome) for speed and rigor
+        run: npx biome check --apply-unsafe .
+
+      - name: 🩺 Run TypeScript Type Check
+        run: npm run typecheck || npm run tsc
+
+      - name: 🧪 Run Unit and Integration Tests
+        # Assuming Vitest/Jest with coverage reporting for Codecov integration
+        run: npm run test -- --coverage
+
+      - name: 🛠️ Validate Expo Configuration
+        # Ensures the project is healthy for native compilation using Expo Doctor
+        run: npx expo doctor
+
+      - name: 📦 Dry Run Native Build Check
+        # Validates configuration and assets for native targets without full compilation
+        run: npx expo prebuild --target bare --clean --no-install --dry-run
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }} # Required for complex Expo environment checks
+
+      - name: 📈 Publish Test Coverage Results (Codecov)
+        uses: codecov/codecov-action@v4
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          fail_ci_if_error: true
+          verbose: true
